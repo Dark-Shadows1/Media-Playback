@@ -2,6 +2,7 @@ import os
 import sys
 import tempfile
 import ctypes
+import traceback
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QSize, QUrl, QTimer, QEventLoop
@@ -290,11 +291,21 @@ class ControlWindow(QMainWindow):
 
 
 if __name__ == "__main__":
-    hide_console_window()
-    app = QApplication(sys.argv)
-    app.setApplicationName("Media Playback Controller")
+    try:
+        hide_console_window()
+        app = QApplication(sys.argv)
+        app.setApplicationName("Media Playback Controller")
 
-    window = ControlWindow()
-    window.show()
+        window = ControlWindow()
+        window.show()
 
-    sys.exit(app.exec())
+        sys.exit(app.exec())
+    except Exception:
+        print("Failed to open Media Playback Controller.", file=sys.stderr)
+        traceback.print_exc()
+        print("\nTerminal is frozen so you can review the error. Press Enter to close.", file=sys.stderr)
+        try:
+            input()
+        except EOFError:
+            pass
+        sys.exit(1)
