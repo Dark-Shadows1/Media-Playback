@@ -33,7 +33,9 @@ class PlaybackWindow(QMainWindow):
         self.setWindowTitle("Playback Display")
 
         self.video_widget = QVideoWidget()
+        self.video_widget.setCursor(Qt.BlankCursor)
         self.setCentralWidget(self.video_widget)
+        self.setCursor(Qt.BlankCursor)
 
         self.player = QMediaPlayer(self)
         self.audio = QAudioOutput(self)
@@ -60,6 +62,7 @@ class ControlWindow(QMainWindow):
         self.player = self.playback_window.player
         self.player.positionChanged.connect(self._on_position_changed)
         self.player.durationChanged.connect(self._on_duration_changed)
+        self.player.mediaStatusChanged.connect(self._on_media_status_changed)
 
     def _build_ui(self):
         toolbar = QToolBar("Playback Controls")
@@ -236,6 +239,14 @@ class ControlWindow(QMainWindow):
 
     def _on_duration_changed(self, duration: int):
         self.position_slider.setRange(0, duration)
+
+    def _on_media_status_changed(self, status):
+        if status != QMediaPlayer.MediaStatus.EndOfMedia:
+            return
+
+        last_frame_position = max(0, self.player.duration() - 1)
+        self.player.setPosition(last_frame_position)
+        self.player.pause()
 
     def player_set_position(self, position: int):
         self.player.setPosition(position)
