@@ -135,7 +135,16 @@ class ControlWindow(QMainWindow):
         if index >= len(screens):
             return
         screen = screens[index]
-        self.playback_window.windowHandle().setScreen(screen)
+
+        window_handle = self.playback_window.windowHandle()
+        if window_handle is None:
+            # Ensure Qt creates the native window handle before assigning a screen.
+            self.playback_window.winId()
+            window_handle = self.playback_window.windowHandle()
+        if window_handle is None:
+            return
+
+        window_handle.setScreen(screen)
         self.playback_window.setGeometry(screen.geometry())
 
     def open_folder(self):
