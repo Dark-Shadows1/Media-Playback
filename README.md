@@ -26,8 +26,8 @@ python app.py
 
 ## Thumbnail previews
 
-- If `ffmpeg` is on `PATH`, the app extracts a frame preview around 2 seconds into each video.
-- If `ffmpeg` is not available, a placeholder image is shown.
+- The app uses Qt Multimedia (`QMediaPlayer` + `QVideoSink`) to capture a frame preview around 2 seconds into each video.
+- If frame capture fails (e.g., unsupported codec/backend), a placeholder image is shown.
 
 ## Build a portable Windows executable
 
@@ -49,4 +49,4 @@ Portable output folder:
 
 Copy this whole folder to another Windows machine and run `MediaPlaybackController.exe`.
 
-> Note: If target machines do not already have codecs/ffmpeg, previews may fall back to placeholders depending on the video format.
+> Note: If target machines do not have codecs supported by the Qt Multimedia backend, previews may fall back to placeholders depending on the video format.

@@ -1,12 +1,11 @@
 import os
 import sys
 import tempfile
-import subprocess
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QSize, QUrl, QTimer
+from PySide6.QtCore import Qt, QSize, QUrl, QTimer, QEventLoop
 from PySide6.QtGui import QAction, QIcon, QPixmap, QColor, QPainter, QFont
-from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer, QVideoSink
 from PySide6.QtMultimediaWidgets import QVideoWidget
 from PySide6.QtWidgets import (
     QApplication,
@@ -173,31 +172,7 @@ class ControlWindow(QMainWindow):
         thumbnail_path = self.thumb_cache / f"{video_path.stem}.jpg"
 
         if not thumbnail_path.exists():
-            ffmpeg_exists = False
-            try:
-                subprocess.run(["ffmpeg", "-version"], capture_output=True, check=False)
-                ffmpeg_exists = True
-            except FileNotFoundError:
-                ffmpeg_exists = False
-
-            if ffmpeg_exists:
-                subprocess.run(
-                    [
-                        "ffmpeg",
-                        "-y",
-                        "-ss",
-                        "00:00:02",
-                        "-i",
-                        str(video_path),
-                        "-frames:v",
-                        "1",
-                        "-vf",
-                        "scale=440:248:force_original_aspect_ratio=decrease,pad=440:248:(ow-iw)/2:(oh-ih)/2",
-                        str(thumbnail_path),
-                    ],
-                    capture_output=True,
-                    check=False,
-                )
+            self._generate_thumbnail_with_qt(video_path, thumbnail_path)
 
         if thumbnail_path.exists():
             return str(thumbnail_path)
@@ -213,6 +188,56 @@ class ControlWindow(QMainWindow):
             painter.end()
             pixmap.save(str(placeholder), "JPG")
         return str(placeholder)
+
+    def _generate_thumbnail_with_qt(self, video_path: Path, thumbnail_path: Path):
+        player = QMediaPlayer(self)
+        sink = QVideoSink(self)
+        player.setVideoSink(sink)
+
+        loop = QEventLoop(self)
+        target_position_ms = 2000
+        seek_requested = False
+
+        def quit_loop():
+            if loop.isRunning():
+                loop.quit()
+
+        def on_media_status_changed(status):
+            nonlocal seek_requested
+            if status == QMediaPlayer.MediaStatus.LoadedMedia:
+                player.play()
+                if not seek_requested:
+                    seek_requested = True
+                    QTimer.singleShot(150, lambda: player.setPosition(target_position_ms))
+
+        def on_video_frame_changed(frame):
+            image = frame.toImage()
+            if image.isNull():
+                return
+
+            source = QPixmap.fromImage(image)
+            scaled = source.scaled(440, 248, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
+            canvas = QPixmap(440, 248)
+            canvas.fill(QColor("#2E3440"))
+            painter = QPainter(canvas)
+            x = (canvas.width() - scaled.width()) // 2
+            y = (canvas.height() - scaled.height()) // 2
+            painter.drawPixmap(x, y, scaled)
+            painter.end()
+
+            canvas.save(str(thumbnail_path), "JPG")
+            quit_loop()
+
+        player.mediaStatusChanged.connect(on_media_status_changed)
+        sink.videoFrameChanged.connect(on_video_frame_changed)
+        player.errorOccurred.connect(lambda *_: quit_loop())
+
+        QTimer.singleShot(4000, quit_loop)
+        player.setSource(QUrl.fromLocalFile(str(video_path)))
+        loop.exec()
+
+        player.stop()
 
     def load_selected_video_paused(self, item: QListWidgetItem):
         path = item.data(Qt.UserRole)
