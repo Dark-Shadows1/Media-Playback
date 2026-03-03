@@ -1,6 +1,7 @@
 import os
 import sys
 import tempfile
+import ctypes
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QSize, QUrl, QTimer, QEventLoop
@@ -24,6 +25,17 @@ from PySide6.QtWidgets import (
 )
 
 SUPPORTED_EXTENSIONS = {".mp4", ".mkv", ".avi", ".mov", ".wmv", ".m4v", ".webm"}
+
+
+def hide_console_window() -> None:
+    """Hide the parent terminal window on Windows builds."""
+    if os.name != "nt":
+        return
+
+    console_window = ctypes.windll.kernel32.GetConsoleWindow()
+    if console_window:
+        SW_HIDE = 0
+        ctypes.windll.user32.ShowWindow(console_window, SW_HIDE)
 
 
 class PlaybackWindow(QMainWindow):
@@ -278,6 +290,7 @@ class ControlWindow(QMainWindow):
 
 
 if __name__ == "__main__":
+    hide_console_window()
     app = QApplication(sys.argv)
     app.setApplicationName("Media Playback Controller")
 
