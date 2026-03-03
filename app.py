@@ -60,9 +60,6 @@ class ControlWindow(QMainWindow):
         self.player = self.playback_window.player
         self.player.positionChanged.connect(self._on_position_changed)
         self.player.durationChanged.connect(self._on_duration_changed)
-        self.player.errorOccurred.connect(self._on_player_error)
-        self.player.mediaStatusChanged.connect(self._on_media_status_changed)
-        self._pause_on_load = False
 
     def _build_ui(self):
         toolbar = QToolBar("Playback Controls")
@@ -134,21 +131,11 @@ class ControlWindow(QMainWindow):
         index = self.monitor_combo.currentData()
         if index is None:
             return
-
         screens = QApplication.screens()
         if index >= len(screens):
             return
-
         screen = screens[index]
-
-        if not self.playback_window.isVisible():
-            self.playback_window.show()
-            QApplication.processEvents()
-
-        handle = self.playback_window.windowHandle()
-        if handle is not None:
-            handle.setScreen(screen)
-
+        self.playback_window.windowHandle().setScreen(screen)
         self.playback_window.setGeometry(screen.geometry())
 
     def open_folder(self):
@@ -220,24 +207,17 @@ class ControlWindow(QMainWindow):
         if not path or not os.path.exists(path):
             return
 
-        self.player.stop()
         self.move_playback_window()
         self.playback_window.showFullScreen()
 
-        self._pause_on_load = True
         self.player.setSource(QUrl.fromLocalFile(path))
-        self.player.play()
 
-    def _on_media_status_changed(self, status: QMediaPlayer.MediaStatus):
-        if status == QMediaPlayer.MediaStatus.LoadedMedia and self._pause_on_load:
-            self._pause_on_load = False
+        def pause_after_start():
             self.player.pause()
-            self.player.setPosition(0)
+            QTimer.singleShot(0, lambda: self.player.setPosition(0))
 
-    def _on_player_error(self, _error, message: str):
-        if not message:
-            return
-        QMessageBox.warning(self, "Playback Error", f"Could not open video:\n{message}")
+        self.player.play()
+        QTimer.singleShot(250, pause_after_start)
 
     def _seek_by(self, delta_ms: int):
         self.player.setPosition(max(0, self.player.position() + delta_ms))
